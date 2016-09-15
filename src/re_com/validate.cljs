@@ -1,8 +1,11 @@
 (ns re-com.validate
-  (:require  [clojure.set           :refer [superset?]]
-             [re-com.util           :refer [deref-or-value]]
-             [reagent.impl.template :refer [valid-tag?]]
-             [goog.string           :as    gstring]))
+  (:require
+    [clojure.set           :refer [superset?]]
+    [re-com.util           :refer [deref-or-value]]
+    [reagent.core          :as    reagent]
+    [reagent.impl.template :refer [valid-tag?]]
+    [goog.string           :as    gstring]
+    [goog.date.UtcDateTime]))
 
 
 ;; -- Helpers -----------------------------------------------------------------
@@ -52,14 +55,14 @@
   [defined-args passed-args]
   (or (superset? defined-args passed-args)
       (let [missing-args (remove defined-args passed-args)]
-        (log-error "Invalid argument(s): " missing-args))))
+        (log-error "Invalid argument(s): " missing-args)))) ;; Regent will show the component-path
 
 (defn required-args-passed?
   "returns true if all the required args are supplied. Otherwise log the error and return false"
   [required-args passed-args]
   (or (superset? passed-args required-args)
       (let [missing-args (remove passed-args required-args)]
-        (log-error "Missing required argument(s): " missing-args))))
+        (log-error "Missing required argument(s): " missing-args)))) ;; Regent will show the component-path
 
 
 (defn validate-fns-pass?
@@ -79,15 +82,20 @@
                              arg-val         (deref-or-value (arg-name passed-args)) ;; Automatically extract value if it's in an atom
                              required?       (:required v-arg-def)
                              validate-result ((:validate-fn v-arg-def) arg-val)
-                             log-msg-base    #(str "Validation failed for argument '" arg-name "' in component '" component-name "': ")]
+                             log-msg-base    (str "Validation failed for argument '" arg-name "' in component '" component-name "': ")
+                             comp-path       (str " at " (reagent/component-path (reagent/current-component)))
+                             warning?        (= (:status validate-result) :warning)]
                          ;(println (str "[" component-name "] " arg-name " = '" (if (nil? arg-val) "nil" (left-string arg-val 200)) "' => " validate-result))
                          (cond
                            (or (true? validate-result)
                                (and (nil? arg-val)          ;; Allow nil values through if the arg is NOT required
                                     (not required?))) true
-                           (false? validate-result)  (log-error (log-msg-base) "Expected '" (:type v-arg-def) "'. Got '" (if (nil? arg-val) "nil" (left-string arg-val 60)) "'")
-                           (map?   validate-result)  ((if (= (:status validate-result) :warning) log-warning log-error) (log-msg-base) (:message validate-result))
-                           :else                      (log-error "Invalid return from validate-fn: " validate-result))))]
+                           (false? validate-result)  (log-error log-msg-base "Expected '" (:type v-arg-def) "'. Got '" (if (nil? arg-val) "nil" (left-string arg-val 60)) "'" comp-path)
+                           (map?   validate-result)  ((if warning? log-warning log-error)
+                                                       log-msg-base
+                                                       (:message validate-result)
+                                                       (when warning? comp-path))
+                           :else                      (log-error "Invalid return from validate-fn: " validate-result comp-path))))]
     (->> (select-keys args-with-validators (vec (keys passed-args)))
          (map validate-arg)
          (every? true?))))
@@ -115,7 +123,7 @@
 (def justify-options      [:start :end :center :between :around])
 (def align-options        [:start :end :center :baseline :stretch])
 (def scroll-options       [:auto :off :on :spill])
-(def alert-types          [:info :warning :danger])
+(def alert-types          [:none :info :warning :danger])
 (def button-sizes         [:regular :smaller :larger])
 (def throbber-sizes       [:regular :small :large])
 (def input-status-types   [:warning :error])
@@ -188,7 +196,17 @@
                   :on-blur :on-change :on-click :on-copy :on-cut :on-double-click :on-drag :on-drag-end :on-drag-enter :on-drag-exit :on-drag-leave
                   :on-drag-over :on-drag-start :on-drop :on-focus :on-input :on-key-down :on-key-press :on-key-up :on-mouse-down :on-mouse-enter
                   :on-mouse-leave :on-mouse-move :on-mouse-out :on-mouse-over :on-mouse-up :on-paste :on-scroll :on-submit :on-touch-cancel
-                  :on-touch-end :on-touch-move :on-touch-start :on-wheel})
+                  :on-touch-end :on-touch-move :on-touch-start :on-wheel
+                  :on-blur-capture :on-change-capture :on-click-capture :on-copy-capture :on-cut-capture :on-double-click-capture :on-drag-capture
+                  :on-drag-end-capture :on-drag-enter-capture :on-drag-exit-capture :on-drag-leave-capture :on-drag-over-capture :on-drag-start-capture
+                  :on-drop-capture :on-focus-capture :on-input-capture :on-key-down-capture :on-key-press-capture :on-key-up-capture :on-mouse-down-capture
+                  :on-mouse-enter-capture :on-mouse-leave-capture :on-mouse-move-capture :on-mouse-out-capture :on-mouse-over-capture :on-mouse-up-capture
+                  :on-paste-capture :on-scroll-capture :on-submit-capture :on-touch-cancel-capture :on-touch-end-capture :on-touch-move-capture
+                  :on-touch-start-capture :on-wheel-capture})
+
+;; Reference: http://facebook.github.io/react/docs/tags-and-attributes.html#supported-attributes
+
+(def extension-attrs #{:data :aria})
 
 ;; Reference: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference
 
@@ -227,7 +245,7 @@
                   :transition-timing-function :turn :unicode-bidi :unicode-range :unset :vertical-align :vh :visibility :vmax :vmin :vw :white-space :widows
                   :width :will-change :word-break :word-spacing :word-wrap :writing-mode :z-index
                   ; ----- Browser specific styles
-                  ::-webkit-user-select :-moz-user-select :-ms-user-select :user-select
+                  :-webkit-user-select :-moz-user-select :-ms-user-select :user-select
                   :-webkit-flex-flow :-webkit-flex-direction :-webkit-flex-wrap :-webkit-justify-content :-webkit-align-items :-webkit-align-content
                   :-webkit-flex :-webkit-flex-grow :-webkit-flex-shrink :-webkit-flex-basis :-webkit-order :-webkit-align-self})
 
@@ -261,6 +279,21 @@
                  {:status  :warning
                   :message (str "Unknown CSS style(s): " (remove css-styles arg-keys))}))))))
 
+(defn extension-attribute?
+  "Returns truthy if the attribute name is an extension attribute, that is data-* or aria-*, otherwise falsey."
+  ([attr]
+   (let [attr (name attr)
+         ext? #(and (= (.indexOf attr %) 0)
+                       (> (count attr) (count %)))]
+     (some (comp ext? #(str % "-") name) extension-attrs))))
+
+(defn invalid-html-attrs
+  "Returns the subset of HTML attributes contained in the passed argument that are not valid HTML attributes."
+  [attrs]
+  (remove #(or (html-attrs %)
+               (extension-attribute? %))
+          attrs))
+
 (defn html-attr?
   "Returns true if the passed argument is a valid HTML, SVG or event attribute.
    Otherwise returns a warning map.
@@ -275,9 +308,10 @@
                  contains-class? (contains? arg-keys :class)
                  contains-style? (contains? arg-keys :style)
                  result   (cond
-                            contains-class?                       ":class not allowed in :attr argument"
-                            contains-style?                       ":style not allowed in :attr argument"
-                            (not (superset? html-attrs arg-keys)) (str "Unknown HTML attribute(s): " (remove html-attrs arg-keys)))]
+                            contains-class? ":class not allowed in :attr argument"
+                            contains-style? ":style not allowed in :attr argument"
+                            :else           (when-let [invalid (not-empty (invalid-html-attrs arg-keys))]
+                                              (str "Unknown HTML attribute(s): " invalid)))]
              (or (nil? result)
                  {:status  (if (or contains-class? contains-style?) :error :warning)
                   :message result}))))))
@@ -286,7 +320,7 @@
   "Returns true if the passed argument is a valid goog.date.UtcDateTime, otherwise false/error"
   [arg]
   (let [arg (deref-or-value arg)]
-    (instance? goog.date.UtcDateTime arg)))
+    (instance? js/goog.date.UtcDateTime arg)))
 
 (defn regex?
   "Returns true if the passed argument is a valid regular expression, otherwise false/error"

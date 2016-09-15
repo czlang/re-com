@@ -120,8 +120,7 @@
                                [:p [:code ":justify"] " is the analog of " [hyperlink-href
                                                                             :label "Flexbox justify-content style"
                                                                             :href "https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content"
-                                                                            :target "_blank"] "."]
-                               [:p [:strong "Note: "] "There is a bug in Chrome. When switching from :between to :around (or visa versa), the change is not shown. To get around this, select a different value beforehand."]]]}
+                                                                            :target "_blank"] "."]]]}
 
             ;; Align
             {:hbox {:over?      false
@@ -368,7 +367,8 @@
                                 [:li "Turn off the h-box " [:code ":height"] " parameter to see how it automatically expands to show the rest of the content in Box2."]
                                 [:li "Edit the box " [:code ":child"] " parameters to change the content to see how the current layout handles more or less content."]]]]}])
 
-(def box-state (reaction (get demos @current-demo)))
+(def box-state       (reagent/atom (get demos @current-demo)))
+(def reset-box-state (reaction (reset! box-state (get demos @current-demo))))
 
 (def show-desc? (reagent/atom true))
 
@@ -407,7 +407,7 @@
   "close button used for all the editors"
   [on-close]
   [button
-   :label    [:i {:class "md-close"
+   :label    [:i {:class "zmdi zmdi-hc-fw-rc zmdi-close"
                   :style {:font-size "20px"
                           :margin-left "8px"}}]
    :on-click #(on-close)
@@ -805,4 +805,5 @@
                                         [gap :size "0px"]
                                         [demo]
                                         [gap :size "0px"]
-                                        [choose-a-demo]]]]]]]))
+                                        [choose-a-demo]
+                                        (when (nil? @reset-box-state) "")]]]]]])) ;; For reset-box-state to fire, we must dereference it in a component

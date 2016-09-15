@@ -1,11 +1,21 @@
 (ns re-com.util
-  (:require  [clojure.set :refer [superset?]]))
+  (:require
+    [clojure.set :refer [superset?]]
+    [goog.date.DateTime]
+    [goog.date.UtcDateTime]))
 
 (defn fmap
   "Takes a function 'f' amd a map 'm'.  Applies 'f' to each value in 'm' and returns.
    (fmap  inc  {:a 4  :b 2})   =>   {:a 5  :b 3}"
   [f m]
   (into {} (for [[k val] m] [k (f val)])))
+
+(defn deep-merge
+  "Recursively merges maps. If vals are not maps, the last value wins."
+  [& vals]
+  (if (every? map? vals)
+    (apply merge-with deep-merge vals)
+    (last vals)))
 
 
 (defn deref-or-value
@@ -35,7 +45,7 @@
 (defn px
   "takes a number (and optional :negative keyword to indicate a negative value) and returns that number as a string with 'px' at the end"
   [val & negative]
-  (str (if negative (- 0 val) val) "px"))
+  (str (if negative (- val) val) "px"))
 
 
 ;; ----------------------------------------------------------------------------
@@ -106,3 +116,17 @@
              (+ sum-scroll-top  (.-scrollTop  current-node)))
       {:left sum-scroll-left
        :top  sum-scroll-top})))
+
+;; ----------------------------------------------------------------------------
+;; date functions
+;; ----------------------------------------------------------------------------
+
+(defn now->utc
+  "Answer a goog.date.UtcDateTime based on local date/time."
+  []
+  (let [local-date (js/goog.date.DateTime.)]
+    (js/goog.date.UtcDateTime.
+      (.getYear local-date)
+      (.getMonth local-date)
+      (.getDate local-date)
+      0 0 0 0)))
